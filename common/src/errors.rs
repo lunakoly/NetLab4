@@ -214,12 +214,30 @@ pub fn with_error_report<F: FnOnce() -> Result<()>>(run: F) {
     };
 }
 
+pub fn is_would_block_io_error(error: &std::io::Error) -> bool {
+    match error.kind() {
+        std::io::ErrorKind::WouldBlock => true,
+        _ => false
+    }
+}
+
 pub fn is_would_block_error(error: &Error) -> bool {
     match &error.kind {
-        ErrorKind::Io { source } => match source.kind() {
-            std::io::ErrorKind::WouldBlock => true,
-            _ => false
-        }
+        ErrorKind::Io { source } => is_would_block_io_error(source),
+        _ => false
+    }
+}
+
+pub fn is_would_block_result<T>(result: &Result<T>) -> bool {
+    match result {
+        Err(error) => is_would_block_error(error),
+        _ => false
+    }
+}
+
+pub fn is_would_block_io_result<T>(result: &std::io::Result<T>) -> bool {
+    match result {
+        Err(error) => is_would_block_io_error(error),
         _ => false
     }
 }

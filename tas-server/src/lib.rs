@@ -2,23 +2,23 @@ pub mod messages;
 pub mod parsing;
 pub mod members;
 
-use std::fs::{DirEntry};
 use std::path::{Path, PathBuf};
-use std::net::{TcpListener, TcpStream, SocketAddr};
-use std::io::{Read, Write};
+use std::net::{TcpListener, TcpStream};
+use std::time::{Duration};
+use std::io::{Write};
 use std::thread;
 
-
-// use std::collections::{HashMap};
-// use std::time::{Duration};
-// use std::path::{Path};
-// use std::fs::{File};
-
-use crate::members::{load_members, save_members, Members, Role};
+use crate::members::{load_members, Members};
 use crate::messages::{ClientMessage, ServerMessage};
 use crate::parsing::{read_message};
 
-use common::{Result, with_error_report};
+use common::{
+    Result,
+    with_error_report,
+    is_would_block_io_result,
+    is_would_block_result,
+};
+
 use common::shared::{IntoShared, Shared};
 use common::shared::vec::{SharedVec};
 
@@ -27,7 +27,7 @@ const DEFAULT_PORT: u32 = 6969;
 struct UserData {
     name: String,
     location: PathBuf,
-    // address: SocketAddr,
+    is_alive: bool,
 }
 
 type User = Shared<UserData>;
@@ -36,6 +36,7 @@ fn empty_user() -> Result<User> {
     let data = UserData {
         name: format!("guest"),
         location: std::env::current_dir()?,
+        is_alive: true,
     };
 
     Ok(data.to_shared())
@@ -51,15 +52,19 @@ struct Session {
     me: User,
     context: Context,
     stream: TcpStream,
+    message_queue: Vec<ServerMessage>,
 }
 
-fn notify(message: &str, stream: &mut TcpStream) -> Result<()> {
+fn force_send_packet(message: &ServerMessage, session: &mut Session) {
+    session.message_queue.push(message.clone());
+}
+
+fn notify(message: &str, session: &mut Session) -> Result<()> {
     let it = ServerMessage::Notification {
         message: message.to_owned()
     };
 
-    let packet = parsing::to_bytes(&it)?;
-    stream.write_all(&packet)?;
+    force_send_packet(&it, session);
     Ok(())
 }
 
@@ -68,35 +73,32 @@ fn handle_login(
     session: &mut Session
 ) -> Result<()> {
     if command.len() < 3 {
-        return notify("The command misses some parameters", &mut session.stream)
+        return notify("The command misses some parameters", session)
     }
 
     let name = &command[1];
     let pass = &command[2];
 
     if !session.context.members.read()?.has_user(name) {
-        return notify(&format!("No such a user > {}", name), &mut session.stream)
+        return notify(&format!("No such a user > {}", name), session)
     }
 
     let settings = session.context.members.read()?.settings_for(name)?;
 
     if pass != &settings.pass {
-        return notify("Incorrect password", &mut session.stream)
+        return notify("Incorrect password", session)
     }
 
     session.me.write()?.name = name.clone();
 
     let role = session.context.members.read()?.role_for(name)?;
 
-    let role_message = ServerMessage::Role {
+    let message = ServerMessage::Role {
         title: role.title,
         allowed_commands: role.allowed_commands,
     };
 
-    let packet = parsing::to_bytes(&role_message)?;
-
-    session.stream.write_all(&packet)?;
-
+    force_send_packet(&message, session);
     Ok(())
 }
 
@@ -121,10 +123,8 @@ fn handle_ls(
     }
 
     let message = ServerMessage::FilesList { files };
-    let packet = parsing::to_bytes(&message)?;
 
-    session.stream.write_all(&packet)?;
-
+    force_send_packet(&message, session);
     Ok(())
 }
 
@@ -133,18 +133,18 @@ fn handle_cd(
     session: &mut Session
 ) -> Result<()> {
     if command.len() < 2 {
-        return notify("The command misses some parameters", &mut session.stream)
+        return notify("The command misses some parameters", session)
     }
 
     let target = &command[1];
     let target_path = Path::new(target);
 
     if !target_path.exists() {
-        return notify("No such a path", &mut session.stream)
+        return notify("No such a path", session)
     }
 
     if !target_path.is_dir() {
-        return notify("This is not a directory", &mut session.stream)
+        return notify("This is not a directory", session)
     }
 
     let mut new_location: PathBuf;
@@ -159,7 +159,7 @@ fn handle_cd(
     let normalized = match new_location.canonicalize() {
         Ok(it) => it,
         Err(error) => {
-            return notify(&format!("Error > {:?}", error), &mut session.stream)
+            return notify(&format!("Error > {:?}", error), session)
         }
     };
 
@@ -169,16 +169,12 @@ fn handle_cd(
         location: location_to_string(&normalized)?
     };
 
-    let packet = parsing::to_bytes(&message)?;
-
-    session.stream.write_all(&packet)?;
+    force_send_packet(&message, session);
 
     Ok(())
 }
 
-fn handle_who(
-    session: &mut Session
-) -> Result<()> {
+fn collect_users(session: &mut Session) -> Result<Vec<(String, String)>> {
     let mut users = vec![];
 
     let users_lock = session.context.users.read()?;
@@ -190,27 +186,65 @@ fn handle_who(
         users.push((name, string));
     }
 
-    let message = ServerMessage::UsersList { users };
-    let packet = parsing::to_bytes(&message)?;
+    Ok(users)
+}
 
-    session.stream.write_all(&packet)?;
+fn handle_who(
+    session: &mut Session
+) -> Result<()> {
+    let users = collect_users(session)?;
+    let message = ServerMessage::UsersList { users };
+
+    force_send_packet(&message, session);
+    Ok(())
+}
+
+fn are_locations_same(a: &PathBuf, b: &PathBuf) -> Result<bool> {
+    let string_a = location_to_string(a)?;
+    let string_b = location_to_string(b)?;
+    Ok(string_a == string_b)
+}
+
+fn handle_kill(
+    command: Vec<String>,
+    session: &mut Session
+) -> Result<()> {
+    if command.len() < 2 {
+        return notify("The command misses some parameters", session)
+    }
+
+    let target = &command[1];
+    let mut count = 0;
+
+    for it in session.context.users.read()?.iter() {
+        let has_same_name = &it.read()?.name == target;
+        let is_nearby = are_locations_same(&it.read()?.location, &session.me.read()?.location)?;
+
+        if has_same_name && is_nearby {
+            it.write()?.is_alive = false;
+            count += 1;
+        }
+    }
+
+    let message = ServerMessage::KillResult {
+        killed_users_count: count as u32,
+    };
+
+    force_send_packet(&message, session);
 
     Ok(())
 }
 
 fn handle_execute(command: Vec<String>, session: &mut Session) -> Result<()> {
     if command.len() == 0 {
-        return notify("Empty command", &mut session.stream)
+        return notify("Empty command", session)
     }
 
     let name = session.me.read()?.name.clone();
     let role = session.context.members.read()?.role_for(&name)?;
 
-    println!("Com > {:?}", &command);
-    println!("> {:?}", &role);
-
     if !role.allowed_commands.contains(&command[0]) {
-        return notify("No such an allowed command for you", &mut session.stream)
+        return notify("No such an allowed command for you", session)
     }
 
     match command[0].as_ref() {
@@ -218,7 +252,8 @@ fn handle_execute(command: Vec<String>, session: &mut Session) -> Result<()> {
         "ls" => handle_ls(session),
         "cd" => handle_cd(command, session),
         "who" => handle_who(session),
-        it => notify(&format!("No such a command > {}", it), &mut session.stream)
+        "kill" => handle_kill(command, session),
+        it => notify(&format!("No such a command > {}", it), session)
     }
 }
 
@@ -227,13 +262,39 @@ enum ClientHandling {
     Stop,
 }
 
+fn process_message_queue(session: &mut Session) -> Result<()> {
+    if session.message_queue.len() == 0 {
+        return Ok(())
+    }
+
+    let first = &session.message_queue[0];
+    let packet = parsing::to_bytes(first)?;
+
+    let result = session.stream.write_all(&packet);
+
+    if is_would_block_io_result(&result) {
+        return Ok(())
+    }
+
+    result?;
+    session.message_queue.remove(0);
+
+    Ok(())
+}
+
 fn handle_client(session: &mut Session) -> Result<ClientHandling> {
+    process_message_queue(session)?;
+
     let result: Result<ClientMessage> = read_message(&mut session.stream);
+
+    if is_would_block_result(&result) {
+        return Ok(ClientHandling::Proceed)
+    }
 
     let message = match result {
         Ok(message) => message,
         Err(error) => {
-            println!("Disconnecting the client {:?} > {}", &mut session.stream.peer_addr(), &error);
+            println!("Disconnecting the client {:?} > {}", session.stream.peer_addr(), &error);
             return Ok(ClientHandling::Stop)
         }
     };
@@ -253,9 +314,7 @@ fn send_initial_role(session: &mut Session) -> Result<()> {
         allowed_commands: guest_role.allowed_commands,
     };
 
-    let packet = parsing::to_bytes(&message)?;
-
-    session.stream.write_all(&packet)?;
+    force_send_packet(&message, session);
     Ok(())
 }
 
@@ -268,9 +327,8 @@ fn send_initial_location(session: &mut Session) -> Result<()> {
     };
 
     let message = ServerMessage::MoveTo { location };
-    let packet = parsing::to_bytes(&message)?;
 
-    session.stream.write_all(&packet)?;
+    force_send_packet(&message, session);
     Ok(())
 }
 
@@ -281,11 +339,17 @@ fn handle_incomming(mut session: Session) -> Result<()> {
     session.context.users.write()?.push(session.me.clone());
 
     loop {
+        if !session.me.read()?.is_alive {
+            break
+        }
+
         let handling = handle_client(&mut session)?;
 
         if let ClientHandling::Stop = handling {
             break;
         }
+
+        std::thread::sleep(Duration::from_millis(16));
     }
 
     Ok(())
@@ -298,12 +362,19 @@ fn handle_connection() -> Result<()> {
     };
 
     let listener = TcpListener::bind(format!("0.0.0.0:{}", DEFAULT_PORT))?;
+    listener.set_nonblocking(true)?;
 
     for incomming in listener.incoming() {
+        if is_would_block_io_result(&incomming) {
+            std::thread::sleep(Duration::from_millis(16));
+            continue
+        }
+
         let session = Session {
             me: empty_user()?,
             context: context.clone(),
             stream: incomming?,
+            message_queue: vec![],
         };
 
         thread::spawn(move || {

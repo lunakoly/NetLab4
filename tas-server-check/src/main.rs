@@ -1,17 +1,8 @@
-use std::net::{TcpListener, TcpStream, SocketAddr};
-use std::io::{Read, Write};
-use std::thread;
-// use std::collections::{HashMap};
-// use std::time::{Duration};
-// use std::path::{Path};
-// use std::fs::{File};
+use std::net::{TcpStream};
 
 use tas_server::messages::{ClientMessage, ServerMessage};
-use tas_server::parsing::{read_message};
 
 use common::{Result, with_error_report};
-use common::shared::{IntoShared, Shared};
-use common::shared::vec::{SharedVec};
 
 const DEFAULT_PORT: u32 = 6969;
 
@@ -81,7 +72,21 @@ fn handle_connection() -> Result<()> {
 
     probe(&it, &mut stream)?;
 
-    Ok(())
+    let it = ClientMessage::Execute {
+        command: vec!["login".into(), "ron".into(), "4321".into()],
+    };
+
+    probe(&it, &mut stream)?;
+
+    let it = ClientMessage::Execute {
+        command: vec!["kill".into(), "ron".into()],
+    };
+
+    probe(&it, &mut stream)?;
+
+    loop {
+        std::thread::sleep(std::time::Duration::from_millis(16));
+    }
 }
 
 pub fn main() {
