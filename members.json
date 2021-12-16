@@ -1,0 +1,25 @@
+{
+    "roles": {
+        "ghost": ["login", "ls", "cd", "who"],
+        "crew": ["login", "ls", "cd", "who"],
+        "amogus": ["login", "ls", "cd", "who", "kill"]
+    },
+    "users": {
+        "guest": {
+            "role": "ghost",
+            "pass": ""
+        },
+        "sam": {
+            "role": "crew",
+            "pass": "1234"
+        },
+        "john": {
+            "role": "crew",
+            "pass": "qwer"
+        },
+        "ron": {
+            "role": "amogus",
+            "pass": "4321"
+        }
+    }
+}
