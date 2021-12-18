@@ -1,5 +1,4 @@
 pub mod messages;
-pub mod parsing;
 pub mod members;
 
 use std::path::{Path, PathBuf};
@@ -10,7 +9,6 @@ use std::thread;
 
 use crate::members::{load_members, Members};
 use crate::messages::{ClientMessage, ServerMessage};
-use crate::parsing::{read_message};
 
 use common::{
     Result,
@@ -19,6 +17,7 @@ use common::{
     is_would_block_result,
 };
 
+use common::parsing::{self, read_message};
 use common::shared::{IntoShared, Shared};
 use common::shared::vec::{SharedVec};
 

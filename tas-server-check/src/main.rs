@@ -7,9 +7,9 @@ use common::{Result, with_error_report};
 const DEFAULT_PORT: u32 = 6969;
 
 fn probe(message: &ClientMessage, stream: &mut TcpStream) -> Result<()> {
-    tas_server::parsing::to_writer(&message, stream)?;
+    common::parsing::to_writer(&message, stream)?;
 
-    let it: ServerMessage = tas_server::parsing::read_message(stream)?;
+    let it: ServerMessage = common::parsing::read_message(stream)?;
     println!("{:?}\n", &it);
 
     Ok(())
@@ -18,10 +18,10 @@ fn probe(message: &ClientMessage, stream: &mut TcpStream) -> Result<()> {
 fn handle_connection() -> Result<()> {
     let mut stream = TcpStream::connect(format!("localhost:{}", DEFAULT_PORT))?;
 
-    let it: ServerMessage = tas_server::parsing::read_message(&mut stream)?;
+    let it: ServerMessage = common::parsing::read_message(&mut stream)?;
     println!("{:?}\n", &it);
 
-    let it: ServerMessage = tas_server::parsing::read_message(&mut stream)?;
+    let it: ServerMessage = common::parsing::read_message(&mut stream)?;
     println!("{:?}\n", &it);
 
     let it = ClientMessage::Execute {

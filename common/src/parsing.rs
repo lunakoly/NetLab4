@@ -1,8 +1,8 @@
 use std::io::{Read, Write};
 use std::net::{TcpStream};
 
-use common::{Result};
-use common::helpers::{misconfiguration};
+use crate::{Result};
+use crate::helpers::{misconfiguration};
 
 use bson::{Document};
 use bson::{doc};
