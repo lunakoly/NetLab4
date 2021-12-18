@@ -21,7 +21,7 @@ use common::parsing::{self, read_message};
 use common::shared::{IntoShared, Shared};
 use common::shared::vec::{SharedVec};
 
-const DEFAULT_PORT: u32 = 6969;
+pub const DEFAULT_PORT: u32 = 6969;
 
 struct UserData {
     name: String,
