@@ -36,7 +36,7 @@ pub fn warning<T: Default>(message: &str) -> Result<T> {
 macro_rules! serializable {
     ( $($declaration:item)* ) => {
         $(
-            #[derive(Serialize, Deserialize, Debug, Clone)]
+            #[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
             $declaration
         )*
     };

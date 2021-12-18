@@ -5,8 +5,6 @@ use common::helpers::{misconfiguration};
 use common::serializable;
 use common::{Result};
 
-use serde::{Serialize, Deserialize};
-
 serializable! {
     pub struct UserSettings {
         pub role: String,

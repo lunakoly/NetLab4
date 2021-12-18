@@ -1,7 +1,5 @@
 use common::serializable;
 
-use serde::{Serialize, Deserialize};
-
 serializable! {
     pub enum ClientMessage {
         Execute { command: Vec<String> },
