@@ -10,6 +10,8 @@ members = [
     "common",
     "tas-server",
     "tas-server-check",
+    "primes-client",
+    "primes-client-check",
 ]
 
 [dependencies]
