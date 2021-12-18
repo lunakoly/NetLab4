@@ -54,7 +54,7 @@ struct Session {
     message_queue: Vec<ServerMessage>,
 }
 
-fn force_send_packet(message: &ServerMessage, session: &mut Session) {
+fn send_packet(message: &ServerMessage, session: &mut Session) {
     session.message_queue.push(message.clone());
 }
 
@@ -63,7 +63,7 @@ fn notify(message: &str, session: &mut Session) -> Result<()> {
         message: message.to_owned()
     };
 
-    force_send_packet(&it, session);
+    send_packet(&it, session);
     Ok(())
 }
 
@@ -97,7 +97,7 @@ fn handle_login(
         allowed_commands: role.allowed_commands,
     };
 
-    force_send_packet(&message, session);
+    send_packet(&message, session);
     Ok(())
 }
 
@@ -123,7 +123,7 @@ fn handle_ls(
 
     let message = ServerMessage::FilesList { files };
 
-    force_send_packet(&message, session);
+    send_packet(&message, session);
     Ok(())
 }
 
@@ -168,8 +168,7 @@ fn handle_cd(
         location: location_to_string(&normalized)?
     };
 
-    force_send_packet(&message, session);
-
+    send_packet(&message, session);
     Ok(())
 }
 
@@ -194,7 +193,7 @@ fn handle_who(
     let users = collect_users(session)?;
     let message = ServerMessage::UsersList { users };
 
-    force_send_packet(&message, session);
+    send_packet(&message, session);
     Ok(())
 }
 
@@ -229,8 +228,7 @@ fn handle_kill(
         killed_users_count: count as u32,
     };
 
-    force_send_packet(&message, session);
-
+    send_packet(&message, session);
     Ok(())
 }
 
@@ -313,7 +311,7 @@ fn send_initial_role(session: &mut Session) -> Result<()> {
         allowed_commands: guest_role.allowed_commands,
     };
 
-    force_send_packet(&message, session);
+    send_packet(&message, session);
     Ok(())
 }
 
@@ -327,7 +325,7 @@ fn send_initial_location(session: &mut Session) -> Result<()> {
 
     let message = ServerMessage::MoveTo { location };
 
-    force_send_packet(&message, session);
+    send_packet(&message, session);
     Ok(())
 }
 
