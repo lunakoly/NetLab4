@@ -1,5 +1,7 @@
 # Home Assignment #3
 
+## About
+
 The goal of this lab is team development of 2 protocols according to some formal tasks.
 
 The protocols below have been in pair with [FenstonSingel](https://github.com/FenstonSingel).
