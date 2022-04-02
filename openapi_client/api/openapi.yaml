@@ -1,0 +1,229 @@
+openapi: 3.0.1
+info:
+  contact:
+    email: lunyak.na@edu.spbstu.ru
+  description: This is an OpenAPI version of the [Amogus Terminal](https://github.com/lunakoly/NetLab3)
+    protocol.
+  title: Amogus Terminal
+  version: 1.0.0
+servers:
+- url: /
+tags:
+- description: Main Commands
+  name: Main
+paths:
+  /user/new:
+    get:
+      operationId: getNewUser
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200'
+          description: Here is the default identity
+        "400":
+          content: {}
+          description: Your request is junk
+      summary: Get the initial user context
+      tags:
+      - Main
+  /user/me:
+    get:
+      operationId: getMyself
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200_1'
+          description: Here is your status
+        "400":
+          content: {}
+          description: Your request is junk
+      summary: Returns your status
+      tags:
+      - Main
+  /query:
+    post:
+      operationId: postQuery
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Query'
+        description: The command line to run
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KillResult'
+          description: Here is the kill result
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+          description: Here is a new role for you
+        "202":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilesList'
+          description: Here are the files
+        "203":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsersList'
+          description: Here are your crewmates
+        "206":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+          description: Some random information
+        "207":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MoveTo'
+          description: Here is the new location
+        "400":
+          content: {}
+          description: Your request is junk
+        "500":
+          content: {}
+          description: You are dead
+      security:
+      - sus: []
+      summary: Run a command
+      tags:
+      - Main
+      x-codegen-request-body-name: Request Body
+components:
+  schemas:
+    Query:
+      example:
+        arguments:
+        - arguments
+        - arguments
+      properties:
+        arguments:
+          items:
+            type: string
+          type: array
+      required:
+      - arguments
+      type: object
+    Notification:
+      properties:
+        message:
+          type: string
+      required:
+      - message
+      type: object
+    Role:
+      example:
+        title: title
+        allowed_commands:
+        - allowed_commands
+        - allowed_commands
+      properties:
+        title:
+          type: string
+        allowed_commands:
+          items:
+            type: string
+          type: array
+      required:
+      - allowed_commands
+      - title
+      type: object
+    FilesList:
+      properties:
+        files:
+          items:
+            type: string
+          type: array
+      required:
+      - files
+      type: object
+    UsersList:
+      properties:
+        users:
+          items:
+            $ref: '#/components/schemas/UsersList_users'
+          type: array
+      required:
+      - users
+      type: object
+    MoveTo:
+      example:
+        location: location
+      properties:
+        location:
+          type: string
+      required:
+      - location
+      type: object
+    KillResult:
+      example:
+        killed_users_count: 0
+      properties:
+        killed_users_count:
+          format: uint32
+          type: integer
+      required:
+      - killed_users_count
+      type: object
+    inline_response_200:
+      example:
+        role:
+          title: title
+          allowed_commands:
+          - allowed_commands
+          - allowed_commands
+        identity: identity
+        location:
+          location: location
+      properties:
+        role:
+          $ref: '#/components/schemas/Role'
+        location:
+          $ref: '#/components/schemas/MoveTo'
+        identity:
+          type: string
+      required:
+      - identity
+      - location
+      - role
+      type: object
+    inline_response_200_1:
+      example:
+        is_alive: true
+      properties:
+        is_alive:
+          type: boolean
+      required:
+      - is_alive
+      type: object
+    UsersList_users:
+      properties:
+        user:
+          type: string
+        location:
+          type: string
+      required:
+      - location
+      - user
+      type: object
+  securitySchemes:
+    sus:
+      in: header
+      name: Identity
+      type: apiKey
+x-original-swagger-version: "2.0"
+

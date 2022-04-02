@@ -12,6 +12,7 @@ pub enum ErrorKind {
     SendError { message: String },
     SystemTime { source: std::time::SystemTimeError },
     Configuration { message: String },
+    Uuid { message: String },
 }
 
 impl std::fmt::Display for ErrorKind {
@@ -52,6 +53,9 @@ impl std::fmt::Display for ErrorKind {
             }
             ErrorKind::Configuration { message } => {
                 write!(formatter, "Incorrect configuration > {}", message)
+            }
+            ErrorKind::Uuid { message } => {
+                write!(formatter, "Uuid error > {}", message)
             }
         }
     }
@@ -196,6 +200,16 @@ impl From<std::time::SystemTimeError> for Error {
         Error {
             kind: ErrorKind::SystemTime {
                 source: source,
+            }
+        }
+    }
+}
+
+impl From<uuid::Error> for Error {
+    fn from(source: uuid::Error) -> Self {
+        Error {
+            kind: ErrorKind::Uuid {
+                message: format!("{}", source),
             }
         }
     }

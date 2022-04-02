@@ -1,5 +1,5 @@
 [package]
-name = "net-lab-3"
+name = "net-lab-4"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,10 +9,9 @@ edition = "2021"
 members = [
     "common",
     "tas-server",
-    "tas-server-check",
-    "primes-client",
-    "primes-client-check",
+    "openapi_client",
 ]
 
 [dependencies]
 tas-server = { path = "tas-server" }
+openapi_client = { path = "./openapi_client" }
